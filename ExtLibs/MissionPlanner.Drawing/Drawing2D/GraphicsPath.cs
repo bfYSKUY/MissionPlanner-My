@@ -90,6 +90,22 @@ namespace System.Drawing.Drawing2D
             this.types = new List<byte>(types);
         }
 
+        public static implicit operator SKPath(GraphicsPath gr)
+        {
+            gr.Flatten();
+            var path = new SKPath();
+            var gpi = new GraphicsPathIterator(gr);
+            for (int a = 0; a < gpi.SubpathCount; a++)
+            {
+                var gp = new GraphicsPath();
+                bool closed = false;
+                gpi.NextSubpath(gp, out closed);
+                path.AddPoly(gp.PathPoints.Select(b => new SKPoint(b.X, b.Y)).ToArray(), closed);
+            }
+
+            return path;
+        }
+
         void Append(float x, float y, PathPointType type, bool compress)
         {
             byte t = (byte) type;
@@ -1969,13 +1985,16 @@ namespace System.Drawing.Drawing2D
             StringFormat genericTypographic)
         {
             var paint = new SKPaint()
-                {Typeface = SKTypeface.FromFamilyName(fontFontFamily?.Name), TextSize = fontsize * 1.3333f};
-            var path = paint.GetTextPath(s, point.X, point.Y + fontsize * 1.3333f);
+                {Typeface = SKTypeface.FromFamilyName(fontFontFamily?.Name), TextSize = fontsize};
+            var path = paint.GetTextPath(s, point.X, point.Y + fontsize);
 
-            if(path.Points.Length < 3)
-                AddLines(path.Points.Select(a => new PointF(a.X, a.Y)).ToArray());
-            else
-                AddPolygon(path.Points.Select(a => new PointF(a.X, a.Y)).ToArray());
+            if(path.Points.Length > 1) 
+            {
+                if(path.Points.Length < 3)
+                    AddLines(path.Points.Select(a => new PointF(a.X, a.Y)).ToArray());
+                else
+                    AddPolygon(path.Points.Select(a => new PointF(a.X, a.Y)).ToArray()); 
+            }
         }
     }
 }

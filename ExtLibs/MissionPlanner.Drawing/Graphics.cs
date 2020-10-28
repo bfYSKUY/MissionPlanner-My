@@ -8,6 +8,7 @@ using System.Drawing.Text;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace System.Drawing
@@ -71,12 +72,17 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             //_rec.BeginRecording(new SKRect(0, 0, width, height));
         }
 
-        public Region Clip { get; set; }
-        public RectangleF ClipBounds { get; }
+        public Region Clip {
+            get { return new Region(Rectangle.FromLTRB((int)_image.LocalClipBounds.Left,(int) _image.LocalClipBounds.Top, (int)_image.LocalClipBounds.Right,(int) _image.LocalClipBounds.Bottom)); }
+            set { _image.ClipRect(value.Bounds, (SKClipOperation) 5); }
+        }
+        public RectangleF ClipBounds {
+            get { return new RectangleF(_image.LocalClipBounds.Left,_image.LocalClipBounds.Top,_image.LocalClipBounds.Width,_image.LocalClipBounds.Height); }
+        }
         public CompositingMode CompositingMode { get; set; }
         public CompositingQuality CompositingQuality { get; set; }
-        public float DpiX { get; }
-        public float DpiY { get; }
+        public float DpiX { get; } = 96;
+        public float DpiY { get; } = 96;
         public InterpolationMode InterpolationMode { get; set; }
         public bool IsClipEmpty { get; }
         public bool IsVisibleClipEmpty { get; }
@@ -95,14 +101,24 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             set
             {
                 var values = value.Data;
-                _image.SetMatrix(new SKMatrix(values[0], values[2], values[4],
-                    values[1], values[3], values[5],
+                _image.SetMatrix(new SKMatrix(value.M11, value.M12, value.OffsetX,
+                    value.M21, value.M22, value.OffsetY,
                     0, 0, 1));
             }
         }
 
         public RectangleF VisibleClipBounds { get; }
-        private SKCanvas _image => _surface.Canvas; //_rec.RecordingCanvas;//_surface.Canvas;
+
+        private SKCanvas _overridecanvas = null;
+        public SKCanvas _image
+        {
+            get
+            {
+                if (_overridecanvas != null)
+                    return _overridecanvas;
+                return _surface.Canvas;
+            }
+        }
 
         public SKSurface Surface
         {
@@ -123,10 +139,29 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
 
         public static Graphics FromImage(Image bmpDestination)
         {
+            if (bmpDestination.Width == 0 || bmpDestination.Height == 0)
+                return new Graphics(SKSurface.CreateNull(1, 1));
+
             var bmpdata = ((Bitmap) bmpDestination).LockBits(
                 new Rectangle(0, 0, bmpDestination.Width, bmpDestination.Height),
                 null, SKColorType.Bgra8888);
             return new Graphics(SKSurface.Create(bmpDestination.nativeSkBitmap.Info, bmpdata.Scan0));
+        }
+
+        public static Graphics FromSKImage(SKImage bmpDestination)
+        {
+            if (bmpDestination.IsLazyGenerated)
+            {
+                var pixels = bmpDestination.ToRasterImage().PeekPixels();
+                if (pixels == null)
+                    return new Graphics(SKSurface.CreateNull(1,1));
+                return new Graphics(SKSurface.Create(pixels));
+            }
+            else
+            {
+                var pixels = bmpDestination.PeekPixels();
+                return new Graphics(SKSurface.Create(pixels));
+            }
         }
 
         public static implicit operator Image(Graphics sk)
@@ -346,33 +381,65 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             DrawImage(image, rect.X, rect.Y, rect.Width, rect.Height);
         }
 
-        /// <summary>
-        ///     Implemented
-        /// </summary>
+/// <summary>Draws the specified <see cref="T:System.Drawing.Image" /> at the specified location and with the specified size.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="x">The x-coordinate of the upper-left corner of the drawn image.</param>
+/// <param name="y">The y-coordinate of the upper-left corner of the drawn image.</param>
+/// <param name="width">Width of the drawn image.</param>
+/// <param name="height">Height of the drawn image.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image image, float x, float y, float width, float height)
         {
             DrawImage(image, (long) x, (long) y, (long) width, (long) height);
             //throw new NotImplementedException();
         }
-
+        /// <summary>Draws the specified <see cref="T:System.Drawing.Image" />, using its original physical size, at the specified location.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="point">
+///   <see cref="T:System.Drawing.Point" /> structure that represents the location of the upper-left corner of the drawn image.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image image, Point point)
         {
             DrawImage(image, point.X, (float) point.Y);
         }
-
+        /// <summary>Draws the specified image, using its original physical size, at the location specified by a coordinate pair.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="x">The x-coordinate of the upper-left corner of the drawn image.</param>
+/// <param name="y">The y-coordinate of the upper-left corner of the drawn image.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image image, int x, int y)
         {
             DrawImage(image, x, (float) y);
         }
-
+        /// <summary>Draws the specified <see cref="T:System.Drawing.Image" /> at the specified location and with the specified size.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="rect">
+///   <see cref="T:System.Drawing.Rectangle" /> structure that specifies the location and size of the drawn image.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image image, Rectangle rect)
         {
             DrawImage(image, rect.X, rect.Y, rect.Width, (float) rect.Height);
         }
-
+        /// <summary>Draws the specified <see cref="T:System.Drawing.Image" /> at the specified location and with the specified size.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="x">The x-coordinate of the upper-left corner of the drawn image.</param>
+/// <param name="y">The y-coordinate of the upper-left corner of the drawn image.</param>
+/// <param name="width">Width of the drawn image.</param>
+/// <param name="height">Height of the drawn image.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image image, int x, int y, int width, int height)
         {
-            DrawImage(image, (float) x, y, width, height);
+            DrawImage(image, new Rectangle(x,y,width,height),new Rectangle(0,0,image.Width,image.Height), GraphicsUnit.Pixel);
         }
 
         public void DrawImage(Image image, PointF[] destPoints)
@@ -397,12 +464,21 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
 
         public void DrawImage(Image image, RectangleF destRect, RectangleF srcRect, GraphicsUnit srcUnit)
         {
-            throw new NotImplementedException();
+            DrawImage(image, destRect.ToRectangle(),srcRect.ToRectangle(),srcUnit);
         }
-
+        /// <summary>Draws the specified portion of the specified <see cref="T:System.Drawing.Image" /> at the specified location and with the specified size.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="destRect">
+///   <see cref="T:System.Drawing.Rectangle" /> structure that specifies the location and size of the drawn image. The image is scaled to fit the rectangle.</param>
+/// <param name="srcRect">
+///   <see cref="T:System.Drawing.Rectangle" /> structure that specifies the portion of the <paramref name="image" /> object to draw.</param>
+/// <param name="srcUnit">Member of the <see cref="T:System.Drawing.GraphicsUnit" /> enumeration that specifies the units of measure used by the <paramref name="srcRect" /> parameter.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image image, Rectangle destRect, Rectangle srcRect, GraphicsUnit srcUnit)
         {
-            _image.DrawImage(SKImage.FromBitmap(image.nativeSkBitmap), srcRect.ToSKRect(), destRect.ToSKRect(), null);
+            _image.DrawBitmap(image.nativeSkBitmap, srcRect.ToSKRect(), destRect.ToSKRect(), new SKPaint());
         }
 
         public void DrawImage(Image image, PointF[] destPoints, RectangleF srcRect, GraphicsUnit srcUnit)
@@ -432,7 +508,20 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
         {
             throw new NotImplementedException();
         }
-
+        /// <summary>Draws the specified portion of the specified <see cref="T:System.Drawing.Image" /> at the specified location and with the specified size.</summary>
+/// <param name="image">
+///   <see cref="T:System.Drawing.Image" /> to draw.</param>
+/// <param name="destRect">
+///   <see cref="T:System.Drawing.Rectangle" /> structure that specifies the location and size of the drawn image. The image is scaled to fit the rectangle.</param>
+/// <param name="srcX">The x-coordinate of the upper-left corner of the portion of the source image to draw.</param>
+/// <param name="srcY">The y-coordinate of the upper-left corner of the portion of the source image to draw.</param>
+/// <param name="srcWidth">Width of the portion of the source image to draw.</param>
+/// <param name="srcHeight">Height of the portion of the source image to draw.</param>
+/// <param name="srcUnit">Member of the <see cref="T:System.Drawing.GraphicsUnit" /> enumeration that specifies the units of measure used to determine the source rectangle.</param>
+/// <param name="imageAttrs">
+///   <see cref="T:System.Drawing.Imaging.ImageAttributes" /> that specifies recoloring and gamma information for the <paramref name="image" /> object.</param>
+/// <exception cref="T:System.ArgumentNullException">
+///   <paramref name="image" /> is <see langword="null" />.</exception>
         public void DrawImage(Image img, Rectangle rectangle, float srcX, float srcY, float srcWidth, float srcHeight,
             GraphicsUnit graphicsUnit, ImageAttributes tileFlipXYAttributes)
         {
@@ -443,65 +532,7 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
                 new SKRect(srcX, srcY, srcX + srcWidth, srcY + srcHeight),
                 new SKRect(rectangle.X, rectangle.Y, rectangle.Right, rectangle.Bottom), _paint);
 
-            return;
 
-            var coltype = SKColorType.Bgra8888;
-            ((Bitmap) img).MakeTransparent(Color.Transparent);
-            var data = ((Bitmap) img).LockBits(new Rectangle(0, 0, img.Width, img.Height),
-                ImageLockMode.ReadOnly,
-                SKColorType.Bgra8888);
-
-            if (CompositingMode == CompositingMode.SourceOver)
-                _paint.BlendMode = SKBlendMode.SrcOver;
-            if (CompositingMode == CompositingMode.SourceCopy)
-                _paint.BlendMode = SKBlendMode.Src;
-            //if(img.PixelFormat == PixelFormat.Format32bppArgb)
-            _paint.Color = SKColors.Black;
-
-            var pxmap = new SKPixmap(img.nativeSkBitmap.Info, data.Scan0, data.Stride);
-
-            var image = SKImage.FromPixels(pxmap);
-
-            if (image == null)
-                return;
-            /*
-            lock (this)
-            {
-                img.Save(File.OpenWrite(Settings.GetDataDirectory() + Path.DirectorySeparatorChar + "img.jpg"),
-                    SKEncodedImageFormat.Jpeg);
-
-                pxmap.Encode(SKEncodedImageFormat.Jpeg, 100)
-                    .SaveTo(File.OpenWrite(Settings.GetDataDirectory() + Path.DirectorySeparatorChar + "pxmap.jpg"));
-
-                image.Encode(SKEncodedImageFormat.Jpeg, 100)
-                    .SaveTo(File.OpenWrite(Settings.GetDataDirectory() + Path.DirectorySeparatorChar + "image.jpg"));
-            }
-            */
-            _image.DrawImage(image, new SKRect(srcX, srcY, srcX + srcWidth, srcY + srcHeight),
-                new SKRect(rectangle.X, rectangle.Y, rectangle.Right, rectangle.Bottom), _paint);
-            ((Bitmap) img).UnlockBits(data);
-            data = null;
-
-            return;
-
-            try
-            {
-                using (var skbmp =
-                    new SKBitmap(new SKImageInfo(img.Width, img.Height, coltype, SKAlphaType.Unpremul)))
-                {
-                    skbmp.SetPixels(data.Scan0);
-
-
-                    _image.DrawBitmap(skbmp, new SKRect(srcX, srcY, srcX + srcWidth, srcY + srcHeight),
-                        new SKRect(rectangle.X, rectangle.Y, rectangle.Right, rectangle.Bottom) /*, _paint*/);
-                }
-            }
-            catch
-            {
-            }
-
-            ((Bitmap) img).UnlockBits(data);
-            data = null;
         }
 
         public void DrawImage(Image image, Rectangle destRect, int srcX, int srcY, int srcWidth, int srcHeight,
@@ -514,13 +545,13 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             GraphicsUnit srcUnit,
             ImageAttributes imageAttr)
         {
-            DrawImageUnscaled(image, destRect.X, destRect.Y);
+            DrawImage(image, destRect, (float)srcX, srcY, srcWidth, srcHeight, srcUnit, imageAttr);
             //throw new NotImplementedException();
         }
 
         public void DrawImage(Image img, long i, long i1, long width, long height)
         {
-            DrawImage(img, new Rectangle((int) i, (int) i1, (int) width, (int) height), 0.0f, 0, width, height,
+            DrawImage(img, new Rectangle((int) i, (int) i1, (int)width, (int)height), 0.0f, 0, img.Width, img.Height,
                 GraphicsUnit.Pixel,
                 new ImageAttributes());
         }
@@ -528,28 +559,31 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
         public void DrawImage(Image image, Rectangle rectangle, int p1, int p2, long p3, long p4,
             GraphicsUnit graphicsUnit, ImageAttributes TileFlipXYAttributes)
         {
-            DrawImage(image, rectangle, (float) rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height,
+            DrawImage(image, rectangle, (float) p1,p2,p3,p4,
                 GraphicsUnit.Pixel, new ImageAttributes());
         }
 
         public void DrawImageUnscaled(Image image, int x, int y, int width, int height)
         {
-            throw new NotImplementedException();
+            DrawImageUnscaledAndClipped(image, new Rectangle(x,y,width,height));
         }
 
         public void DrawImageUnscaledAndClipped(Image image, Rectangle rect)
         {
+            _image.Save();
+            _image.ClipRect(rect.ToSKRect(), SKClipOperation.Intersect);
             _image.DrawImage(SKImage.FromBitmap(image.nativeSkBitmap), rect.X, rect.Y, null);
+            _image.Restore();
         }
 
         public void DrawImageUnscaled(Image image, Point point)
         {
-            DrawImage(image, point.X, (float) point.Y);
+            DrawImageUnscaled(image, point.X, point.Y);
         }
 
         public void DrawImageUnscaled(Image image, int x, int y)
         {
-            DrawImage(image, x, y, image.Width, image.Height);
+            _image.DrawImage(SKImage.FromBitmap(image.nativeSkBitmap), x, y, null);
         }
 
         public void DrawImageUnscaled(Image image, Rectangle rect)
@@ -739,6 +773,38 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             DrawText(s, font, brush, layoutRectangle, format, false);
         }
 
+        private static string AddNewLinesToText(string text, int maximumSingleLineTooltipLength)
+        {
+            if (text.Length < maximumSingleLineTooltipLength)
+                return text;
+            int lineLength = maximumSingleLineTooltipLength;
+            StringBuilder sb = new StringBuilder();
+            int currentLinePosition = 0;
+            for (int textIndex = 0; textIndex < text.Length; textIndex++)
+            {
+                // If we have reached the target line length and the next      
+                // character is whitespace then begin a new line.   
+                if (currentLinePosition >= lineLength &&
+                    char.IsWhiteSpace(text[textIndex]))
+                {
+                    sb.Append(Environment.NewLine);
+                    currentLinePosition = 0;
+                }
+                // reset line lnegth counter on existing new line
+                if (text[textIndex] == Environment.NewLine[Environment.NewLine.Length -1])
+                {
+                    currentLinePosition = 1;
+                }
+                // If we have just started a new line, skip all the whitespace.    
+                if (currentLinePosition == 0)
+                    while (textIndex < text.Length && char.IsWhiteSpace(text[textIndex]))
+                        textIndex++;
+                // Append the next character.     
+                if (textIndex < text.Length) sb.Append(text[textIndex]);
+                currentLinePosition++;
+            }
+            return sb.ToString();
+        }
         public void DrawText(string s, Font font, Brush brush, RectangleF layoutRectangle,
             StringFormat format, bool duno)
         {
@@ -749,18 +815,19 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             var fnt = font.ToSKPaint();
             var textBounds = MeasureString(s, font);
 
+            if (layoutRectangle.Width > 0 && textBounds.Width > layoutRectangle.Width)
+            {
+                s = AddNewLinesToText(s, (int) (layoutRectangle.Width / MeasureString("A", font).Width));
+                textBounds = MeasureString(s, font);
+            }
+
             pnt.TextSize = fnt.TextSize;
             pnt.Typeface = fnt.Typeface;
-
+            pnt.FakeBoldText = font.Bold;
+            
             pnt.StrokeWidth = 1;
-
-            if (textBounds.Width > layoutRectangle.Width - 2 && layoutRectangle.Width != 0)
-            {
-                DrawText(_image, s,
-                    new SKRect(layoutRectangle.X, layoutRectangle.Y, layoutRectangle.Width, layoutRectangle.Height),
-                    pnt);
-                return;
-            }
+            if(font.Bold)
+                pnt.StrokeWidth = 2;
 
             if (format.Alignment == StringAlignment.Center)
             {
@@ -772,23 +839,22 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
                 layoutRectangle.Y += layoutRectangle.Height / 2 - textBounds.Height / 2;
             }
 
-            _image.DrawText(s, layoutRectangle.X, layoutRectangle.Y + textBounds.Height, pnt);
-        }
+            if (format.FormatFlags == StringFormatFlags.DirectionVertical)
+            {
+                pnt.IsVerticalText = true;
+            }
+            else
+            {
+                pnt.IsVerticalText = false;
+            }
 
-        private void DrawText(SKCanvas canvas, string text, SKRect area, SKPaint paint)
-        {
-            float lineHeight = paint.TextSize * 1.1f;
-            var lines = SplitLines(text, paint, area.Width);
-            var height = lines.Count() * lineHeight;
-
-            var y = area.MidY - 2 - height / 2;
-
+            var lines = s.Trim().Split('\n');
+            int a=0;
             foreach (var line in lines)
             {
-                y += lineHeight;
-                var x = area.MidX - line.Width / 2;
-                canvas.DrawText(line.Value, x, y, paint);
-            }
+                _image.DrawText(line.TrimEnd(), layoutRectangle.X, layoutRectangle.Y - 2 + (a+1) *font.Height, pnt);
+                a++;
+            }            
         }
 
         public class Line
@@ -1145,12 +1211,12 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
             var bound = new SKRect();
             var width = 0.0f;
             var height = 0.0f;
-            var lines = text.Split('\n');
+            var lines = text.Trim().Split('\n');
             foreach (var line in lines)
             {
                 font.ToSKPaint().MeasureText(line, ref bound);
                 width = Math.Max(width, bound.Width);
-                height += bound.Height;
+                height += font.Height;
             }
 
             return new SizeF(width, height);
@@ -1176,6 +1242,7 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
         public void ResetTransform()
         {
             _image.ResetMatrix();
+            ResetClip();
         }
 
 
@@ -1230,6 +1297,7 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
 
         public void SetClip(Rectangle rect)
         {
+            ResetClip();
             _image.ClipRect(rect.ToSKRect());
         }
 
@@ -1241,6 +1309,7 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
 
         public void SetClip(RectangleF rect)
         {
+            ResetClip();
             _image.ClipRect(new SKRect(rect.Left, rect.Top, rect.Right, rect.Bottom));
         }
 
@@ -1252,8 +1321,28 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
 
         public void SetClip(GraphicsPath path)
         {
+            ResetClip();
+
+            path.Flatten();
+
             var skpath = new SKPath();
-            skpath.AddPoly(path.PathPoints.Select(a => new SKPoint(a.X, a.Y)).ToArray());
+            int startIndex = 0;
+            int endIndex = 0;
+            bool isClosed = false;
+            var pathData = path.PathData;
+            var iterator = new GraphicsPathIterator(path);
+            var subPaths = iterator.SubpathCount;
+            for (int sp = 0; sp < subPaths; sp++)
+            {
+                var numOfPoints = iterator.NextSubpath(out startIndex, out endIndex, out isClosed);
+
+                var subPoints = pathData.Points.Skip(startIndex).Take(numOfPoints).ToArray();
+                var subTypes = pathData.Types.Skip(startIndex).Take(numOfPoints).ToArray();
+
+
+                skpath.AddPoly(subPoints.Select(a => new SKPoint(a.X, a.Y)).ToArray());
+            }
+
             _image.ClipPath(skpath);
         }
 
@@ -1497,6 +1586,8 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
         {
             Console.WriteLine("FromHwnd");
 
+            return new Graphics(SKSurface.CreateNull(1, 1));
+
             //get client rect
             //hwnd to hdc
             return HwndToGraphics(windowHandle);
@@ -1530,5 +1621,12 @@ GRBackendRenderTargetDesc backendRenderTargetDescription = new GRBackendRenderTa
         public void CopyFromScreen(int i, int i1, int i2, int i3, Size size)
         {
         }
-    }
+
+        public static Graphics FromCanvas(SKCanvas beginRecording)
+        {
+            var nullsurface = SKSurface.CreateNull(1,1);
+            return new Graphics(nullsurface) {_overridecanvas = beginRecording};
+
+        }
+    } 
 }

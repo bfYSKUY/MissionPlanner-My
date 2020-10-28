@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
+using System.Security.Cryptography.X509Certificates;
 using SkiaSharp;
 
 namespace System.Drawing
@@ -29,6 +31,16 @@ namespace System.Drawing
             return new SKRectI(rect.Left, rect.Top, rect.Right, rect.Bottom);
         }
 
+        public static Rectangle ToRectangle(this RectangleF rect)
+        {
+            return new Rectangle((int)rect.X,(int)rect.Y,(int)rect.Width,(int)rect.Height);
+        }
+
+        public static RectangleF ToRectangleF(this Rectangle rect)
+        {
+            return new Rectangle(rect.X,rect.Y,rect.Width,rect.Height);
+        }
+
         public static SKPaint ToSKPaint(this Pen pen)
         {
             pen.nativePen.StrokeWidth = pen.Width;
@@ -44,17 +56,41 @@ namespace System.Drawing
 
         public static SKPaint ToSKPaint(this Font font)
         {
+            var fm = SKFontManager.Default;
+            var id = font.Name;
             lock (fontcache)
-            {
-                if (!fontcache.ContainsKey(font.SystemFontName))
-                    fontcache[font.SystemFontName] = SKTypeface.FromFamilyName(font.SystemFontName);
-            }
+                if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh")
+                {
+                    id = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+                    if (!fontcache.ContainsKey(id))
+                        fontcache[CultureInfo.CurrentUICulture.TwoLetterISOLanguageName] =
+                            fm.MatchCharacter("", new[] {"zh"}, '飞');
+                }
+                else if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ja")
+                {
+                    id = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+                    if (!fontcache.ContainsKey(id))
+                        fontcache[CultureInfo.CurrentUICulture.TwoLetterISOLanguageName] =
+                            fm.MatchCharacter("", new[] {"ja"}, 'フ');
+                }
+                else if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "kr")
+                {
+                    id = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+                    if (!fontcache.ContainsKey(id))
+                        fontcache[CultureInfo.CurrentUICulture.TwoLetterISOLanguageName] =
+                            fm.MatchCharacter("", new[] {"kr"}, '비');
+                }
+                else
+                {
+                    if (!fontcache.ContainsKey(id))
+                        fontcache[id] = SKTypeface.FromFamilyName(id);
+                }
 
             return new SKPaint
             {
-                Typeface = fontcache[font.SystemFontName],
-                TextSize = font.Size,
-                StrokeWidth = 2
+                Typeface = fontcache[id],
+                TextSize = font.SizeInPoints * 1.33334f,
+                StrokeWidth = 2,
             };
         }
 
@@ -85,22 +121,52 @@ namespace System.Drawing
                 return brushcache[((SolidBrush) brush).Color];
             }
 
+            if (brush is HatchBrush)
+            {
+                return brush.nativeBrush;
+            }
+
+            if (brush is TextureBrush)
+            {
+                return brush.nativeBrush;
+            }
+
             if (brush is LinearGradientBrush)
             {
                 var lgb = (LinearGradientBrush) brush;
-                return new SKPaint
+                if (lgb._gradMode == LinearGradientMode.Horizontal)
                 {
-                    IsAntialias = true,
-                    Style = SKPaintStyle.Fill,
-                    Shader = SKShader.CreateLinearGradient(new SKPoint(lgb.Rectangle.X, lgb.Rectangle.Y),
-                        new SKPoint(lgb.Rectangle.X, lgb.Rectangle.Bottom),
-                        new[]
-                        {
-                            ((LinearGradientBrush) brush).LinearColors[0].ToSKColor(),
-                            ((LinearGradientBrush) brush).LinearColors[1].ToSKColor()
-                        }
-                        , null, SKShaderTileMode.Clamp, SKMatrix.MakeIdentity())
-                };
+                    return new SKPaint
+                    {
+                        IsAntialias = true,
+                        Style = SKPaintStyle.Fill,
+                        Shader = SKShader.CreateLinearGradient(new SKPoint(lgb.Rectangle.X, lgb.Rectangle.Y),
+                            new SKPoint(lgb.Rectangle.Right, lgb.Rectangle.Y),
+                            new[]
+                            {
+                                ((LinearGradientBrush) brush).LinearColors[0].ToSKColor(),
+                                ((LinearGradientBrush) brush).LinearColors[1].ToSKColor()
+                            }
+                            , null, SKShaderTileMode.Clamp, SKMatrix.MakeIdentity())
+                    };
+                }
+
+                if (lgb._gradMode == LinearGradientMode.Vertical)
+                {
+                    return new SKPaint
+                    {
+                        IsAntialias = true,
+                        Style = SKPaintStyle.Fill,
+                        Shader = SKShader.CreateLinearGradient(new SKPoint(lgb.Rectangle.X, lgb.Rectangle.Y),
+                            new SKPoint(lgb.Rectangle.X, lgb.Rectangle.Bottom),
+                            new[]
+                            {
+                                ((LinearGradientBrush) brush).LinearColors[0].ToSKColor(),
+                                ((LinearGradientBrush) brush).LinearColors[1].ToSKColor()
+                            }
+                            , null, SKShaderTileMode.Clamp, SKMatrix.MakeIdentity())
+                    };
+                }
             }
 
             return new SKPaint();

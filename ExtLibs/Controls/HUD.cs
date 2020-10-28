@@ -39,7 +39,9 @@ namespace MissionPlanner.Controls
 
         private MemoryStream _streamjpg = new MemoryStream();
 
-        //[System.ComponentModel.Browsable(false)]
+        [System.ComponentModel.Browsable(false)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public MemoryStream streamjpg
         {
             get
@@ -630,6 +632,9 @@ namespace MissionPlanner.Controls
         public bool lowvoltagealert { get; set; }
 
         [System.ComponentModel.Browsable(true), System.ComponentModel.Category("Values")]
+        public bool criticalvoltagealert { get; set; }
+
+        [System.ComponentModel.Browsable(true), System.ComponentModel.Category("Values")]
         public bool connected { get; set; }
 
         [System.ComponentModel.Browsable(true), System.ComponentModel.Category("Values")]
@@ -640,6 +645,9 @@ namespace MissionPlanner.Controls
 
         [System.ComponentModel.Browsable(true), System.ComponentModel.Category("Values")]
         public string message { get; set; } = "";
+
+        [System.ComponentModel.Browsable(true), System.ComponentModel.Category("Values")]
+        public MAVLink.MAV_SEVERITY messageSeverity { get; set; } = MAVLink.MAV_SEVERITY.EMERGENCY;
 
         [System.ComponentModel.Browsable(true), System.ComponentModel.Category("Values")]
         public float vibex { get; set; }
@@ -834,6 +842,11 @@ namespace MissionPlanner.Controls
             {
                 //  return;
             }
+
+            if (!Enabled)
+                return;
+            if (Disposing)
+                return;
 
             //base.Refresh();
             using (Graphics gg = this.CreateGraphics())
@@ -2529,9 +2542,14 @@ namespace MissionPlanner.Controls
                     text = HUDT.Bat + _batterylevel.ToString("0.00v") + " " + _current.ToString("0.0 A") + " " +
                            (_batteryremaining) + "%";
 
-                    if (lowvoltagealert)
+                    if (criticalvoltagealert)
                     {
                         drawstring(text, font, fontsize + 2, (SolidBrush) Brushes.Red, fontsize,
+                            this.Height - ((fontsize + 2) * 3) - fontoffset);
+                    }
+                    else if (lowvoltagealert)
+                    {
+                        drawstring(text, font, fontsize + 2, (SolidBrush)Brushes.Orange, fontsize,
                             this.Height - ((fontsize + 2) * 3) - fontoffset);
                     }
                     else
@@ -2686,10 +2704,17 @@ namespace MissionPlanner.Controls
 
                 if (message != null && message != "")
                 {
-                    var newfontsize = calcsize(message, font, fontsize + 10, (SolidBrush) Brushes.Red, Width - 50 - 50);
+                    Brush brush;
+                    if (messageSeverity <= MAVLink.MAV_SEVERITY.ERROR)
+                        brush = Brushes.Red;
+                    else if (messageSeverity <= MAVLink.MAV_SEVERITY.WARNING)
+                        brush = Brushes.Yellow;
+                    else
+                        brush = Brushes.White;
 
+                    var newfontsize = calcsize(message, font, fontsize + 10, (SolidBrush) brush, Width - 50 - 50);
 
-                    drawstring(message, font, newfontsize, (SolidBrush) Brushes.Red, -halfwidth + 50,
+                    drawstring(message, font, newfontsize, (SolidBrush) brush, -halfwidth + 50,
                         halfheight / 3);
                 }
 

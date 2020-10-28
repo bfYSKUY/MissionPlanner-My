@@ -1,9 +1,9 @@
-name: GitHub CI
+name: DotNet Build
 on: push
 
 jobs:
   build:
-    name: Build
+    name: Build Release
     runs-on: windows-latest
 
     steps:
@@ -30,7 +30,7 @@ jobs:
           path: bin\Release\net461
 
   buildDebug:
-    name: Build
+    name: Build Debug
     runs-on: windows-latest
 
     steps:

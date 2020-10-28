@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using log4net;
 using MissionPlanner.Controls;
+using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.PlatformConfiguration;
 using Xamarin.Forms.Xaml;
@@ -33,11 +34,12 @@ namespace Xamarin
                 {
                     if (Device.OS == TargetPlatform.Android)
                     {
-                        System.Environment.Exit(0);
+                        System.Diagnostics.Process.GetCurrentProcess().CloseMainWindow();
                     }
                     else if (Device.OS == TargetPlatform.iOS)
                     {
-                        System.Environment.Exit(0);
+                        System.Diagnostics.Process.GetCurrentProcess().CloseMainWindow();
+                        //System.Environment.Exit(0);
                     }
                 }
             });
@@ -50,15 +52,16 @@ namespace Xamarin
             Instance = this;
 
             InitializeComponent();
-          
+
+            MasterBehavior = MasterBehavior.Popover;
+            IsPresented = false;
+
+            DeviceDisplay.KeepScreenOn = true;
 
             try
             {
-             
-
                 MasterPage.ListView.ItemSelected += ListView_ItemSelected;
 
-                AppDomain.CurrentDomain.UnhandledException += CurrentDomainOnUnhandledException;
                 TaskScheduler.UnobservedTaskException += TaskSchedulerOnUnobservedTaskException;
             } catch
             {
