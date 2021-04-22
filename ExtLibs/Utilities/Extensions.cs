@@ -3,12 +3,14 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using K4os.Compression.LZ4;
 using MissionPlanner.Comms;
 using Newtonsoft.Json;
 
@@ -68,6 +70,19 @@ namespace MissionPlanner.Utilities
                 yield return sublist;
                 // continue on in the list
                 source = source.Skip(include);
+            }
+        }
+
+        public static IEnumerable<T> Traverse<T>(this IEnumerable<T> items, 
+            Func<T, IEnumerable<T>> childSelector)
+        {
+            var stack = new Stack<T>(items);
+            while(stack.Any())
+            {
+                var next = stack.Pop();
+                yield return next;
+                foreach(var child in childSelector(next))
+                    stack.Push(child);
             }
         }
 
@@ -568,6 +583,16 @@ namespace MissionPlanner.Utilities
                 else vals.Push(Double.Parse(s));
             }
             return vals.Pop();
+        }
+
+        public static byte[] Compress(this byte[] input)
+        {
+            return LZ4Pickler.Pickle(input);
+        }
+
+        public static byte[] Decompress(this byte[] input)
+        {
+            return LZ4Pickler.Unpickle(input);
         }
     }
 }

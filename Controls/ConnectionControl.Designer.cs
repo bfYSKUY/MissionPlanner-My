@@ -38,10 +38,9 @@
             // cmb_Baud
             // 
             this.cmb_Baud.BackColor = System.Drawing.Color.Black;
-            this.cmb_Baud.DropDownWidth = 150;
+            this.cmb_Baud.DropDownWidth = 110;
             resources.ApplyResources(this.cmb_Baud, "cmb_Baud");
             this.cmb_Baud.ForeColor = System.Drawing.Color.White;
-            this.cmb_Baud.FormattingEnabled = true;
             this.cmb_Baud.Items.AddRange(new object[] {
             resources.GetString("cmb_Baud.Items"),
             resources.GetString("cmb_Baud.Items1"),
@@ -56,7 +55,9 @@
             resources.GetString("cmb_Baud.Items10"),
             resources.GetString("cmb_Baud.Items11"),
             resources.GetString("cmb_Baud.Items12"),
-            resources.GetString("cmb_Baud.Items13")});
+            resources.GetString("cmb_Baud.Items13"),
+            resources.GetString("cmb_Baud.Items14"),
+            resources.GetString("cmb_Baud.Items15")});
             this.cmb_Baud.Name = "cmb_Baud";
             // 
             // cmb_Connection

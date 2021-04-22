@@ -252,6 +252,22 @@ namespace MissionPlanner.Comms
                     catch
                     {
                     }
+
+                    try
+                    {
+                        allPorts.AddRange(Directory.GetFiles("/dev/", "tty.*"));
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        allPorts.AddRange(Directory.GetFiles("/dev/", "cu.*"));
+                    }
+                    catch
+                    {
+                    }
                 }
 
                 string[] ports = null;
@@ -480,7 +496,6 @@ namespace MissionPlanner.Comms
             try
             {
                 base.Open();
-                base.WriteTimeout = -1;
             }
             catch
             {

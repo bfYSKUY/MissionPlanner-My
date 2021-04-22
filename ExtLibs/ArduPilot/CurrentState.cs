@@ -354,6 +354,10 @@ namespace MissionPlanner
         [GroupText("Position")]
         public float gpshdg_acc { get; private set; }
 
+        [DisplayText("GPS Yaw (deg)")]
+        [GroupText("Position")]
+        public float gpsyaw { get; private set; }
+
         [DisplayText("Latitude2 (dd)")]
         [GroupText("Position")]
         public double lat2 { get; set; }
@@ -921,6 +925,7 @@ namespace MissionPlanner
         [GroupText("NAV")]
         public float targetalt { get; private set; }
 
+        [JsonIgnore] [IgnoreDataMember]
         public List<(DateTime time, string message)> messages { get; set; } = new List<(DateTime, string)>();
 
         /// <summary>
@@ -1068,27 +1073,27 @@ namespace MissionPlanner
         }
 
         [GroupText("Battery")]
-        [DisplayText("Bat2 Current (Amps)")]
+        [DisplayText("Bat3 Current (Amps)")]
         public double current3 { get; set; }
 
         [GroupText("Battery")]
-        [DisplayText("Bat2 Current (Amps)")]
+        [DisplayText("Bat4 Current (Amps)")]
         public double current4 { get; set; }
 
         [GroupText("Battery")]
-        [DisplayText("Bat2 Current (Amps)")]
+        [DisplayText("Bat5 Current (Amps)")]
         public double current5 { get; set; }
 
         [GroupText("Battery")]
-        [DisplayText("Bat2 Current (Amps)")]
+        [DisplayText("Bat6 Current (Amps)")]
         public double current6 { get; set; }
 
         [GroupText("Battery")]
-        [DisplayText("Bat2 Current (Amps)")]
+        [DisplayText("Bat7 Current (Amps)")]
         public double current7 { get; set; }
 
         [GroupText("Battery")]
-        [DisplayText("Bat2 Current (Amps)")]
+        [DisplayText("Bat8 Current (Amps)")]
         public double current8 { get; set; }
 
         [GroupText("Battery")]
@@ -1211,7 +1216,7 @@ namespace MissionPlanner
         [GroupText("Position")] public PointLatLngAlt Location => new PointLatLngAlt(lat, lng, altasl);
         [GroupText("Position")] public PointLatLngAlt TargetLocation { get; set; } = PointLatLngAlt.Zero;
 
-
+        [JsonIgnore] [IgnoreDataMember]
         public float GeoFenceDist
         {
             get
@@ -1721,6 +1726,34 @@ namespace MissionPlanner
         [GroupText("Generator")]
         public int gen_maint_time { get; set; }
 
+        [GroupText("EFI")]
+        [DisplayText("EFI Baro Pressure (kPa)")]
+        public float efi_baro { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Head Temp (C)")]
+        public float efi_headtemp { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Load (%)")]
+        public float efi_load { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Health")]
+        public byte efi_health { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Exhast Temp (C)")]
+        public float efi_exhasttemp { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Intake Temp (C)")]
+        public float efi_intaketemp { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI rpm")]
+        public float efi_rpm { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Fuel Flow (g/min)")]
+        public float efi_fuelflow { get; private set; }
+        [GroupText("EFI")]
+        [DisplayText("EFI Fuel Consumed (g)")]
+        public float efi_fuelconsumed { get; private set; }
+
         public object Clone()
         {
             return MemberwiseClone();
@@ -1912,6 +1945,83 @@ namespace MissionPlanner
                         }
 
                         break;
+                    case (uint)MAVLink.MAVLINK_MSG_ID.HIGH_LATENCY2:
+                        {
+                            var highlatency = mavLinkMessage.ToStructure<MAVLink.mavlink_high_latency2_t>();
+                            
+                            {
+                                var modelist = Common.getModesList(firmware);
+
+                                if (modelist != null)
+                                {
+                                    var found = false;
+
+                                    foreach (var pair in modelist)
+                                        if (pair.Key == highlatency.custom_mode)
+                                        {
+                                            mode = pair.Value;
+                                            _mode = highlatency.custom_mode;
+                                            found = true;
+                                            break;
+                                        }
+
+                                    if (!found)
+                                        log.Warn("Mode not found cm:" +
+                                                 highlatency.custom_mode);
+                                }
+                            }
+
+                            lat = highlatency.latitude / 1e7;
+                            lng = highlatency.longitude / 1e7;
+                            //custom_mode
+                            altasl = highlatency.altitude;
+                            alt = altasl - (float)HomeAlt;
+                            alt_error = highlatency.target_altitude - alt;
+                            targetalt = highlatency.target_altitude;
+                            wp_dist = highlatency.target_distance;
+                            wpno = highlatency.wp_num;
+                           
+                            if (highlatency.failure_flags != 0)
+                            {
+                                var flags = highlatency.failure_flags;
+
+                                var errors = "";
+
+                                for (var a = 1; a <= (int) MAVLink.HL_FAILURE_FLAG.MISSION; a = a << 1)
+                                {
+                                    var currentbit = flags & a;
+                                    if (currentbit == 1)
+                                    {
+                                        var currentflag =
+                                            (MAVLink.HL_FAILURE_FLAG)
+                                            Enum.Parse(typeof(MAVLink.HL_FAILURE_FLAG), a.ToString());
+
+                                        errors += currentflag + " ";
+                                    }
+                                }
+
+                                if (errors != "")
+                                    messageHigh = Strings.ERROR + " " + errors;
+
+                            }
+
+                            yaw = highlatency.heading * 2;
+                            target_bearing = highlatency.target_heading*2;
+                            ch3percent = highlatency.throttle;
+                            airspeed = highlatency.airspeed;
+                            targetairspeed = highlatency.airspeed_sp;
+                            groundspeed = highlatency.groundspeed;
+                            wind_vel = highlatency.windspeed / 5.0f;
+                            wind_dir = highlatency.wind_heading * 2;
+                            gpshdop = highlatency.eph;
+                            // epv
+                            raw_temp = highlatency.temperature_air;
+                            climbrate = highlatency.climb_rate;
+                            battery_remaining = highlatency.battery;
+
+                        }
+
+                        break;
                     case (uint)MAVLink.MAVLINK_MSG_ID.HIL_CONTROLS:
 
                         // hil mavlink 0.9 and 1.0
@@ -2068,17 +2178,14 @@ namespace MissionPlanner
                                     {
                                         case MAVLink.EKF_STATUS_FLAGS.EKF_ATTITUDE: // step 1
                                             ekfstatus = 1;
-                                            log.Info("EKF red has no EKF_ATTITUDE - " +
-                                                     (MAVLink.EKF_STATUS_FLAGS)ekfstatusm.flags);
+                                            //log.Info("EKF red has no EKF_ATTITUDE - " + (MAVLink.EKF_STATUS_FLAGS)ekfstatusm.flags);
                                             break;
                                         case MAVLink.EKF_STATUS_FLAGS.EKF_VELOCITY_HORIZ: // with pos
                                             if (gpsstatus > 0)
                                             {
                                                 // we have gps and dont have vel_hoz
                                                 ekfstatus = 1;
-                                                log.Info(
-                                                    "EKF red has gps lock but no EKF_ATTITUDE and EKF_VELOCITY_HORIZ - " +
-                                                    (MAVLink.EKF_STATUS_FLAGS)ekfstatusm.flags);
+                                                //log.Debug("EKF red has gps lock but no EKF_ATTITUDE and EKF_VELOCITY_HORIZ - " + (MAVLink.EKF_STATUS_FLAGS)ekfstatusm.flags);
                                             }
 
                                             break;
@@ -2129,6 +2236,25 @@ namespace MissionPlanner
                             else if (sonar.id == 2) rangefinder3 = sonar.current_distance;
                         }
 
+                        break;
+                    case (uint)MAVLink.MAVLINK_MSG_ID.EFI_STATUS:
+
+                        {
+                            var efi = mavLinkMessage.ToStructure<MAVLink.mavlink_efi_status_t>();
+
+                            if (efi.ecu_index == 0)
+                            {
+                                efi_baro = efi.barometric_pressure;
+                                efi_headtemp = efi.cylinder_head_temperature;
+                                efi_load = efi.engine_load;
+                                efi_health = efi.health;
+                                efi_exhasttemp = efi.exhaust_gas_temperature;
+                                efi_intaketemp = efi.intake_manifold_temperature;
+                                efi_rpm = efi.rpm;
+                                efi_fuelflow = efi.fuel_flow;
+                                efi_fuelconsumed = efi.fuel_consumed;
+                            }
+                        }
                         break;
                     case (uint)MAVLink.MAVLINK_MSG_ID.POWER_STATUS:
 
@@ -2183,8 +2309,16 @@ namespace MissionPlanner
                             }
                             else
                             {
-                                armed = (hb.base_mode & (byte)MAVLink.MAV_MODE_FLAG.SAFETY_ARMED) ==
+                                var newarmed = (hb.base_mode & (byte)MAVLink.MAV_MODE_FLAG.SAFETY_ARMED) ==
                                         (byte)MAVLink.MAV_MODE_FLAG.SAFETY_ARMED;
+
+                                // reset state on armed state change
+                                if(armed == false && newarmed == true)
+                                {
+                                    timeSinceArmInAir = 0;
+                                }
+
+                                armed = newarmed;
 
                                 // saftey switch
                                 if (armed && sensors_enabled.motor_control == false && sensors_enabled.seen)
@@ -2529,7 +2663,7 @@ namespace MissionPlanner
                             alt = loc.relative_alt / 1000.0f;
 
                             useLocation = true;
-                            if (loc.lat == 0 && loc.lon == 0)
+                            if (loc.lat == 0 || loc.lon == 0 || loc.lat == int.MaxValue || loc.lon == int.MaxValue)
                             {
                                 useLocation = false;
                             }
@@ -2547,15 +2681,17 @@ namespace MissionPlanner
                         }
 
                         break;
-                    case (uint)MAVLink.MAVLINK_MSG_ID.GPS_RAW_INT:
+                    case (uint) MAVLink.MAVLINK_MSG_ID.GPS_RAW_INT:
 
                         {
                             var gps = mavLinkMessage.ToStructure<MAVLink.mavlink_gps_raw_int_t>();
 
                             if (!useLocation)
                             {
-                                lat = gps.lat * 1.0e-7;
-                                lng = gps.lon * 1.0e-7;
+                                if (gps.lat != int.MaxValue)
+                                    lat = gps.lat * 1.0e-7;
+                                if (gps.lon != int.MaxValue)
+                                    lng = gps.lon * 1.0e-7;
 
                                 altasl = gps.alt / 1000.0f;
                                 // alt = gps.alt; // using vfr as includes baro calc
@@ -2565,7 +2701,7 @@ namespace MissionPlanner
                             //                    Console.WriteLine("gpsfix {0}",gpsstatus);
 
                             if (gps.eph != ushort.MaxValue)
-                                gpshdop = (float)Math.Round(gps.eph / 100.0, 2);
+                                gpshdop = (float) Math.Round(gps.eph / 100.0, 2);
 
                             if (gps.satellites_visible != byte.MaxValue)
                                 satcount = gps.satellites_visible;
@@ -2582,6 +2718,7 @@ namespace MissionPlanner
                                 gpsv_acc = gps.v_acc / 1000.0f;
                                 gpsvel_acc = gps.vel_acc / 1000.0f;
                                 gpshdg_acc = gps.hdg_acc / 1e5f;
+                                gpsyaw = gps.yaw / 100.0f;
                             }
                             else
                             {
@@ -2589,6 +2726,7 @@ namespace MissionPlanner
                                 gpsv_acc = -1;
                                 gpsvel_acc = -1;
                                 gpshdg_acc = -1;
+                                gpsyaw = -1;
                             }
 
                             //MAVLink.packets[(byte)MAVLink.MSG_NAMES.GPS_RAW);
@@ -3252,10 +3390,6 @@ namespace MissionPlanner
                             timeInAir++;
                             timeSinceArmInAir++;
                         }
-
-                        // to maintain total timeinair for this session not just based on arming
-                        if (!armed)
-                            timeSinceArmInAir = 0;
 
                         if (!gotwind)
                             dowindcalc();

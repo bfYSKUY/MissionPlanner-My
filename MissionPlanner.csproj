@@ -96,6 +96,8 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Speech" />
     <Reference Include="System.Web, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
     <Reference Include="System.Web.Extensions" />
@@ -335,7 +337,7 @@
     <PackageReference Include="JetBrains.Profiler.SelfApi">
       <Version>2.0.2</Version>
     </PackageReference>
-    <PackageReference Include="log4net" version="2.0.8" targetFramework="net462" />
+    <PackageReference Include="log4net" version="2.0.12" targetFramework="net462" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp">
       <Version>3.6.0</Version>
     </PackageReference>
@@ -352,6 +354,11 @@
     </PackageReference>
     <PackageReference Include="OpenTK.GLControl">
       <Version>3.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="SecurityCodeScan">
+      <Version>3.5.4</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="SharpDX" version="4.1.0" targetFramework="net462" />
     <PackageReference Include="SharpDX.DirectInput" version="4.1.0" targetFramework="net462" />
@@ -374,13 +381,16 @@
     </PackageReference>
     <PackageReference Include="Unofficial.ObjectListView" version="2.6.0" targetFramework="net40" />
     <PackageReference Include="Xamarin.Forms">
-      <Version>4.8.0.1560</Version>
+      <Version>5.0.0.2012</Version>
     </PackageReference>
     <PackageReference Include="zlib.net" version="1.0.4.0" targetFramework="net40" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Antenna\TrackerGeneric.cs" />
     <Compile Include="Common.cs" />
+    <Compile Include="Controls\UAVCANSubscriber.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Controls\ConnectionOptions.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -416,6 +426,12 @@
     </Compile>
     <Compile Include="Controls\Icon\File.cs" />
     <Compile Include="Controls\Icon\Zoom.cs" />
+    <Compile Include="Controls\SpectrogramUI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Controls\SpectrogramUI.Designer.cs">
+      <DependentUpon>SpectrogramUI.cs</DependentUpon>
+    </Compile>
     <Compile Include="Controls\Status.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -473,6 +489,12 @@
     </Compile>
     <Compile Include="GCSViews\ConfigurationView\ConfigFirmwareManifest.Designer.cs">
       <DependentUpon>ConfigFirmwareManifest.cs</DependentUpon>
+    </Compile>
+    <Compile Include="GCSViews\ConfigurationView\ConfigGPSOrder.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="GCSViews\ConfigurationView\ConfigGPSOrder.Designer.cs">
+      <DependentUpon>ConfigGPSOrder.cs</DependentUpon>
     </Compile>
     <Compile Include="GCSViews\ConfigurationView\ConfigHWCompass2.cs">
       <SubType>UserControl</SubType>
@@ -559,6 +581,7 @@
     <None Include="arm\libSkiaSharp.so">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="MissionPlanner.GCSViews.ConfigurationView.ConfigGPSOrder+GPSCAN.datasource" />
     <None Include="MissionPlanner.GCSViews.ConfigurationView.ConfigHWCompass2+CompassDeviceInfo.datasource" />
     <Compile Include="plugins\example2-menu.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -762,6 +785,9 @@
     <EmbeddedResource Include="Controls\GMAPCache.resx">
       <DependentUpon>GMAPCache.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Controls\SpectrogramUI.resx">
+      <DependentUpon>SpectrogramUI.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Controls\Status.resx">
       <DependentUpon>Status.cs</DependentUpon>
     </EmbeddedResource>
@@ -813,6 +839,9 @@
     <EmbeddedResource Include="Controls\ProximityControl.resx">
       <DependentUpon>ProximityControl.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Controls\UAVCANSubscriber.resx">
+      <DependentUpon>UAVCANSubscriber.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Controls\Vibration.ko-KR.resx">
       <DependentUpon>Vibration.cs</DependentUpon>
     </EmbeddedResource>
@@ -830,6 +859,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="GCSViews\ConfigurationView\ConfigFirmwareManifest.resx">
       <DependentUpon>ConfigFirmwareManifest.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="GCSViews\ConfigurationView\ConfigGPSOrder.resx">
+      <DependentUpon>ConfigGPSOrder.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="GCSViews\ConfigurationView\ConfigHWCompass2.resx">
       <DependentUpon>ConfigHWCompass2.cs</DependentUpon>
@@ -903,6 +935,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="GCSViews\ConfigurationView\ConfigUAVCAN.resx">
       <DependentUpon>ConfigUAVCAN.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="GCSViews\ConfigurationView\ConfigUserDefined.resx">
       <DependentUpon>ConfigUserDefined.cs</DependentUpon>
@@ -1121,7 +1154,7 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Joystick\JoystickSetup.cs">
-      <SubType>Form</SubType>
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Joystick\Joy_Button_axis.cs">
       <SubType>Form</SubType>
@@ -4290,6 +4323,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Log\LogDownloadMavLink.resx">
       <DependentUpon>LogDownloadMavLink.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Log\LogDownloadMavLink.ar.resx">
       <DependentUpon>LogDownloadMavLink.cs</DependentUpon>
@@ -4516,7 +4550,9 @@
     </None>
     <None Include="MissionPlanner.GCSViews.ConfigurationView.DeviceInfo.datasource" />
     <None Include="Resources\Gaugebg.png" />
-    <None Include="appxmanifest.xml" />
+    <None Include="appxmanifest.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <Content Include="ArduCopterConfig.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -4878,6 +4914,5 @@
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

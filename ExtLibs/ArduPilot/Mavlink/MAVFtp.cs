@@ -670,7 +670,7 @@ namespace MissionPlanner.ArduPilot.Mavlink
             fileTransferProtocol.payload = payload;
             log.Info("get " + payload.opcode + " " + file + " " + size);
             SortedList<uint, uint> chunkSortedList = new SortedList<uint, uint>();
-            MemoryStream answer = new MemoryStream();
+            MemoryStream answer = new MemoryStream(size);
             var sub = _mavint.SubscribeToPacketType(MAVLink.MAVLINK_MSG_ID.FILE_TRANSFER_PROTOCOL, message =>
             {
                 if (cancel != null && cancel.IsCancellationRequested)
@@ -1028,6 +1028,12 @@ namespace MissionPlanner.ArduPilot.Mavlink
                         timeout.Retries = 0;
                     }
 
+                    if (errorcode == FTPErrorCode.kErrFileNotFound)
+                    {
+                        //stop trying
+                        timeout.Retries = 0;
+                    }
+
                     if (errorcode == FTPErrorCode.kErrNoSessionsAvailable)
                     {
                         kCmdResetSessions();
@@ -1066,6 +1072,9 @@ namespace MissionPlanner.ArduPilot.Mavlink
 
         public List<FtpFileInfo> kCmdListDirectory(string dir, CancellationTokenSource cancel)
         {
+            if (dir.Length > 1)
+                dir = dir.TrimEnd('/');
+
             List <FtpFileInfo> answer = new List<FtpFileInfo>();
             fileTransferProtocol.target_system = _sysid;
             fileTransferProtocol.target_component = _compid;
@@ -1314,7 +1323,7 @@ namespace MissionPlanner.ArduPilot.Mavlink
             };
             fileTransferProtocol.payload = payload;
             log.Info("get " + payload.opcode + " " + file + " " + size);
-            MemoryStream answer = new MemoryStream();
+            MemoryStream answer = new MemoryStream(size);
             sub = _mavint.SubscribeToPacketType(MAVLink.MAVLINK_MSG_ID.FILE_TRANSFER_PROTOCOL, message =>
             {
                 if (cancel != null && cancel.IsCancellationRequested)

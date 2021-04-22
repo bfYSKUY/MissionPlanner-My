@@ -55,7 +55,7 @@ namespace MissionPlanner.Comms
         public int WriteBufferSize { get; set; }
         public int WriteTimeout { get; set; }
         public bool RtsEnable { get; set; }
-        public Stream BaseStream => Stream.Null;
+        public Stream BaseStream => new UDPStream(this);
 
         public void toggleDTR()
         {
@@ -196,7 +196,7 @@ namespace MissionPlanner.Comms
                     }
 
                     // copy mem stream to byte array.
-                    rbuffer = r.GetBuffer();
+                    rbuffer = r.ToArray();
                     // reset head.
                     rbufferread = 0;
                 } while (rbuffer.Length < length && DateTime.Now < deadline);

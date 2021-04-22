@@ -59,6 +59,7 @@ namespace MissionPlanner.Controls
                     return;
                 if (_center.Lat == value.Lat && _center.Lng == value.Lng)
                     return;
+                _centerTime = DateTime.Now;
                 _center.Lat = value.Lat;
                 _center.Lng = value.Lng;
                 _center.Alt = value.Alt;
@@ -78,9 +79,11 @@ namespace MissionPlanner.Controls
             }
         }
 
-        Vector3 _rpy = new Vector3();
+        private MissionPlanner.Utilities.Vector3 _velocity = new MissionPlanner.Utilities.Vector3();
 
-        public Vector3 rpy
+        MissionPlanner.Utilities.Vector3 _rpy = new MissionPlanner.Utilities.Vector3();
+
+        public MissionPlanner.Utilities.Vector3 rpy
         {
             get { return _rpy; }
             set
@@ -370,6 +373,12 @@ namespace MissionPlanner.Controls
         public int minzoom { get; set; } = 12;
         public PointLatLngAlt mousePosition { get; private set; }
 
+        public Utilities.Vector3 Velocity
+        {
+            get { return _velocity; }
+            set { _velocity = value; }
+        }
+
         private int utmzone = -999;
         private PointLatLngAlt llacenter = PointLatLngAlt.Zero;
         private double[] utmcenter = new double[2];
@@ -385,6 +394,7 @@ namespace MissionPlanner.Controls
         Vector3 myrpy = Vector3.UnitX;
         private bool fogon = true;
         private Lines _flightPlanLines;
+        private DateTime _centerTime;
 
         double[] convertCoords(PointLatLngAlt plla)
         {
@@ -427,12 +437,13 @@ namespace MissionPlanner.Controls
             {
                 double heightscale = 1; //(step/90.0)*5;
                 var campos = convertCoords(_center);
+                campos = projectLocation(mypos);
                 var rpy = this.rpy;
                 // use mypos if we are not tracking the mav
                 if (!chk_locktomav.Checked)
                 {
                     campos = mypos;
-                    rpy = myrpy;
+                    rpy = new MissionPlanner.Utilities.Vector3((float) myrpy.X, (float) myrpy.Y, (float) myrpy.Z);
                     KeyboardState input = Keyboard.GetState();
                     float speed = (1.5f);
                     Vector3 position = new Vector3((float) campos[0], (float) campos[1], (float) campos[2]);
@@ -487,7 +498,7 @@ namespace MissionPlanner.Controls
 
                 // save the state
                 mypos = campos;
-                myrpy = rpy;
+                myrpy = new OpenTK.Vector3((float) rpy.x, (float) rpy.y, (float) rpy.z);
 
                 cameraX = campos[0];
                 cameraY = campos[1];
@@ -664,6 +675,19 @@ namespace MissionPlanner.Controls
             {
                 textureSemaphore.Release();
             }
+        }
+
+        private double[] projectLocation(double[] oldpos)
+        {
+            var newloc = LocationProjection.Project(_center, _velocity, _centerTime, DateTime.Now);
+            var newpos = convertCoords(newloc);
+            var factor = 0.3;
+            return new double[]
+            {
+                oldpos[0] * factor + newpos[0] * (1.0 - factor), 
+                oldpos[1] * factor + newpos[1] * (1.0 - factor),
+                oldpos[2] * factor + newpos[2] * (1.0 - factor)
+            };
         }
 
         private int Comparison(KeyValuePair<GPoint, tileInfo> x, KeyValuePair<GPoint, tileInfo> y)

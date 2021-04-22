@@ -354,6 +354,8 @@ namespace MissionPlanner.GCSViews.ConfigurationView
 
                 processToScreen();
 
+                FilterTimerOnElapsed(null, null);
+
                 startup = false;
             }
         }
@@ -420,7 +422,7 @@ namespace MissionPlanner.GCSViews.ConfigurationView
                 Params[e.ColumnIndex, e.RowIndex].Style.BackColor = Color.Green;
                 log.InfoFormat("Queue change {0} = {1}", Params[Command.Index, e.RowIndex].Value, Params[e.ColumnIndex, e.RowIndex].Value);
                 _changes[Params[Command.Index, e.RowIndex].Value] =
-                    float.Parse(((string)Params[e.ColumnIndex, e.RowIndex].Value));
+                    float.Parse((((string)Params[e.ColumnIndex, e.RowIndex].Value).Replace(',','.')),CultureInfo.InvariantCulture);
             }
             catch (Exception)
             {
@@ -526,7 +528,7 @@ namespace MissionPlanner.GCSViews.ConfigurationView
             Params.SortCompare += OnParamsOnSortCompare;
 
             Params.Sort(Params.Columns[Command.Index], ListSortDirection.Ascending);
-
+            
             Params.Enabled = true;
             Params.Visible = true;
             Params.ResumeLayout();
